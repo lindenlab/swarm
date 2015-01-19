@@ -1,0 +1,5 @@
+docker-swarm (0.0.1) unstable; urgency=medium
+
+  * Initial release.
+
+ -- Don Kjer <don@lindenlab.com>  Sun, 18 Jan 2015 23:55:13 +0000

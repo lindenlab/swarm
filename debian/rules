@@ -1,0 +1,12 @@
+#!/usr/bin/make -f
+ROOT_DIR := $(shell pwd)
+UID := $(shell id -u)
+GID := $(shell id -g)
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	rm -rf bin
+	docker run --rm -v $(ROOT_DIR):/go/src/app -v $(ROOT_DIR)/bin:/go/bin lindenlab.com/golang:1.4 bash -c "cd /go/src/app; go-wrapper download && go-wrapper install; chown -R $(UID):$(GID) /go/bin"
+
