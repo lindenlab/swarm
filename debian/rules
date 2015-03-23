@@ -8,5 +8,16 @@ GID := $(shell id -g)
 
 override_dh_auto_build:
 	rm -rf bin
-	docker run --rm -v $(ROOT_DIR):/go/src/app -v $(ROOT_DIR)/bin:/go/bin registry.docker/golang:1.4 bash -c "cd /go/src/app; go-wrapper download && go-wrapper install; chown -R $(UID):$(GID) /go/bin"
+	docker run --rm -v $(ROOT_DIR):/go/src/app -v $(ROOT_DIR)/bin:/go/bin registry.docker/golang:1.4 bash -c "\
+		mkdir -p /go/src/github.com/docker ; \
+		cd /go/src/github.com/docker ; \
+		git clone https://github.com/lindenlab/docker.git ; \
+		cd docker ; git checkout v1.5.0-linden ; \
+		mkdir -p /go/src/github.com/samalba ; \
+		cd /go/src/github.com/samalba ; \
+		git clone https://github.com/lindenlab/dockerclient.git ; \
+		cd dockerclient ; git checkout dns-port-publish ; \
+		cd /go/src/app; \
+		go-wrapper download && go-wrapper install; \
+		chown -R $(UID):$(GID) /go/bin"
 
