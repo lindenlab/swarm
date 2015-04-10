@@ -73,6 +73,7 @@ type RestartPolicy struct {
 
 type PortBinding struct {
 	HostIp   string
+	HostName string
 	HostPort string
 }
 
@@ -114,6 +115,7 @@ type ContainerChanges struct {
 }
 
 type Port struct {
+	HostName    string
 	IP          string
 	PrivatePort int
 	PublicPort  int
