@@ -12,7 +12,7 @@ override_dh_auto_build:
 		mkdir -p /go/src/github.com/docker ; \
 		cd /go/src/github.com/docker ; \
 		git clone https://github.com/lindenlab/docker.git ; \
-		cd docker ; git checkout v1.5.0-linden ; \
+		cd docker ; git checkout v1.6.0-linden1 ; \
 		mkdir -p /go/src/github.com/samalba ; \
 		cd /go/src/github.com/samalba ; \
 		git clone https://github.com/lindenlab/dockerclient.git ; \
