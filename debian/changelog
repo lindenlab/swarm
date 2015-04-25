@@ -1,3 +1,9 @@
+docker-swarm (0.3.0) unstable; urgency=medium
+
+  * Bumping to version 0.3.0
+
+ -- Don Kjer <don@lindenlab.com>  Sat, 25 Apr 2015 18:57:35 +0000
+
 docker-swarm (0.2.0) unstable; urgency=medium
 
   * Bumping to version 0.2.0
