@@ -5,6 +5,7 @@ import (
 
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/scheduler/node"
+	"github.com/docker/docker/nat"
 	"github.com/samalba/dockerclient"
 )
 
@@ -47,9 +48,15 @@ func (p *PortFilter) filterHost(config *cluster.ContainerConfig, nodes []*node.N
 func (p *PortFilter) filterBridge(config *cluster.ContainerConfig, nodes []*node.Node) ([]*node.Node, error) {
 	for _, port := range config.HostConfig.PortBindings {
 		for _, binding := range port {
+			requestedStart, requestedEnd, err := nat.ParsePortRange(binding.HostPort)
+			if err != nil {
+				return nil, err
+			}
 			candidates := []*node.Node{}
 			for _, node := range nodes {
-				if !p.portAlreadyInUse(node, binding) {
+				if in_use, err := p.portAlreadyInUse(node, binding.HostIp, requestedStart, requestedEnd); err != nil {
+					return nil, err
+				} else if !in_use {
 					candidates = append(candidates, node)
 				}
 			}
@@ -75,7 +82,11 @@ func (p *PortFilter) portAlreadyExposed(node *node.Node, requestedPort string) b
 	return false
 }
 
-func (p *PortFilter) portAlreadyInUse(node *node.Node, requested dockerclient.PortBinding) bool {
+func (p *PortFilter) portAlreadyInUse(node *node.Node, requestedIp string, requestedStart, requestedEnd int) (bool, error) {
+	if requestedStart == 0 && requestedEnd == 0 {
+		return false, nil
+	}
+	portsInUse := make(map[int]interface{})
 	for _, c := range node.Containers {
 		// HostConfig.PortBindings contains the requested ports.
 		// NetworkSettings.Ports contains the actual ports.
@@ -89,36 +100,51 @@ func (p *PortFilter) portAlreadyInUse(node *node.Node, requested dockerclient.Po
 		//    NetworkSettings.Port will be null and we have to check
 		//    HostConfig.PortBindings to find out the mapping.
 
-		if p.compare(requested, c.Info.HostConfig.PortBindings) || p.compare(requested, c.Info.NetworkSettings.Ports) {
-			return true
+		if all_in_use, err := p.compare(portsInUse, requestedIp, requestedStart, requestedEnd, c.Info.HostConfig.PortBindings); err != nil {
+			return false, err
+		} else if all_in_use {
+			return true, nil
+		}
+		if all_in_use, err := p.compare(portsInUse, requestedIp, requestedStart, requestedEnd, c.Info.NetworkSettings.Ports); err != nil {
+			return false, err
+		} else if all_in_use {
+			return true, nil
 		}
 	}
-	return false
+	return false, nil
 }
 
-func (p *PortFilter) compare(requested dockerclient.PortBinding, bindings map[string][]dockerclient.PortBinding) bool {
+func (p *PortFilter) compare(portsInUse map[int]interface{}, requestedIp string, requestedStart, requestedEnd int, bindings map[string][]dockerclient.PortBinding) (bool, error) {
 	for _, binding := range bindings {
 		for _, b := range binding {
-			if b.HostPort == "" {
+			bindingStart, bindingEnd, err := nat.ParsePortRange(b.HostPort)
+			if err != nil {
+				return false, err
+			}
+			if (bindingStart == 0 && bindingEnd == 0) || (bindingStart != bindingEnd) {
 				// Skip undefined HostPorts. This happens in bindings that
 				// didn't explicitely specify an external port.
+				// Also skip HostPort ranges; rely only on NetworkSettings.Port for this case.
 				continue
 			}
 
-			if b.HostPort == requested.HostPort {
-				// Another container on the same host is binding on the same
-				// port/protocol.  Verify if they are requesting the same
+			if bindingStart >= requestedStart && bindingStart <= requestedEnd {
+				// Another container on the same host is binding in the same
+				// port/protocol range.  Verify if they are requesting the same
 				// binding IP, or if the other container is already binding on
 				// every interface.
-				if requested.HostIp == b.HostIp || bindsAllInterfaces(requested) || bindsAllInterfaces(b) {
-					return true
+				if requestedIp == b.HostIp || bindsAllInterfaces(requestedIp) || bindsAllInterfaces(b.HostIp) {
+					portsInUse[bindingStart] = true
+					if len(portsInUse) >= (requestedEnd - requestedStart + 1) {
+						return true, nil
+					}
 				}
 			}
 		}
 	}
-	return false
+	return false, nil
 }
 
-func bindsAllInterfaces(binding dockerclient.PortBinding) bool {
-	return binding.HostIp == "0.0.0.0" || binding.HostIp == ""
+func bindsAllInterfaces(hostIp string) bool {
+	return hostIp == "0.0.0.0" || hostIp == ""
 }
